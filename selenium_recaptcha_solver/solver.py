@@ -171,17 +171,79 @@ class RecaptchaSolver:
 
         tmp_files = {mp3_file, wav_file}
 
+        link = download_link.get_attribute('href')
+        
+        # Method 1: Try using Selenium's fetch API with current session
+        try:
+            import base64
+            audio_content = self._driver.execute_script("""
+                return fetch(arguments[0], {
+                    credentials: 'include',
+                    mode: 'cors'
+                })
+                .then(response => response.arrayBuffer())
+                .then(buffer => {
+                    let binary = '';
+                    const bytes = new Uint8Array(buffer);
+                    for (let i = 0; i < bytes.byteLength; i++) {
+                        binary += String.fromCharCode(bytes[i]);
+                    }
+                    return btoa(binary);
+                })
+                .catch(error => {
+                    console.error('Fetch error:', error);
+                    return null;
+                });
+            """, link)
+            
+            if audio_content:
+                audio_download_content = base64.b64decode(audio_content)
+            else:
+                # Method 2: Click the download link directly and intercept
+                download_link.click()
+                time.sleep(2)
+                
+                # Try downloading with requests using cookies from Selenium
+                cookies = self._driver.get_cookies()
+                session = requests.Session()
+                for cookie in cookies:
+                    session.cookies.set(cookie['name'], cookie['value'])
+                
+                headers = {
+                    'User-Agent': self._driver.execute_script("return navigator.userAgent;"),
+                    'Accept': 'audio/mpeg, audio/mp3, audio/*',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Referer': self._driver.current_url,
+                }
+                
+                audio_download = session.get(url=link, headers=headers, allow_redirects=True)
+                audio_download_content = audio_download.content
+                
+        except Exception as e:
+            raise RecaptchaException(f'Failed to download audio file: {str(e)}')
+        
+        # Ensure we have content
+        if not audio_download_content:
+            raise RecaptchaException(f'Downloaded audio file is empty. URL: {link}')
+        
+        # Write the file
         with open(mp3_file, 'wb') as f:
-            link = download_link.get_attribute('href')
-
-            audio_download = requests.get(url=link, allow_redirects=True)
-
-            f.write(audio_download.content)
-
-            f.close()
-
-        # Convert MP3 to WAV format for compatibility with speech recognizer APIs
-        AudioSegment.from_mp3(mp3_file).export(wav_file, format='wav')
+            f.write(audio_download_content)
+        
+        # Verify the file was written correctly
+        if not os.path.exists(mp3_file) or os.path.getsize(mp3_file) == 0:
+            raise RecaptchaException('Failed to save audio file')
+        
+        try:
+            # Convert MP3 to WAV format for compatibility with speech recognizer APIs
+            AudioSegment.from_mp3(mp3_file).export(wav_file, format='wav')
+        except Exception as e:
+            # Try alternative method with file handle
+            with open(mp3_file, 'rb') as mp3_fh:
+                try:
+                    AudioSegment.from_file(mp3_fh, format='mp3').export(wav_file, format='wav')
+                except Exception as inner_e:
+                    raise RecaptchaException(f'Failed to convert audio file: {str(inner_e)}')
 
         # Disable dynamic energy threshold to avoid failed reCAPTCHA audio transcription due to static noise
         self._recognizer.dynamic_energy_threshold = False
@@ -193,7 +255,17 @@ class RecaptchaSolver:
                 recognized_text = self._service.recognize(self._recognizer, audio, language)
 
             except sr.UnknownValueError:
-                raise RecaptchaException('Speech recognition API could not understand audio, try again')
+                # Try to retry by clicking new audio challenge
+                try:
+                    self._click_button(
+                        by=By.ID,
+                        locator='recaptcha-audio-button',
+                        delay=self.delay_config.wait_after_click_audio_button
+                    )
+                    # Recursive call to try again with new audio
+                    return self._solve_audio_challenge(language)
+                except:
+                    raise RecaptchaException('Speech recognition API could not understand audio, try again')
 
         # Clean up all temporary files
         for path in tmp_files:

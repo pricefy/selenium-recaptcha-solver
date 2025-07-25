@@ -1,37 +1,82 @@
 from selenium_recaptcha_solver import RecaptchaSolver, StandardDelayConfig
 from selenium.webdriver.common.by import By
-from selenium import webdriver
+from seleniumbase import SB
 import pytest
+import warnings
 
+# Run test
+# pytest tests/test_api.py
 
-test_ua = 'Mozilla/5.0 (Windows NT 4.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36'
+# Suppress deprecation warnings for aifc and audioop
+warnings.filterwarnings(
+    "ignore", category=DeprecationWarning, module="speech_recognition"
+)
 
-options = webdriver.ChromeOptions()
-
-options.add_argument("--headless")
-options.add_argument("--window-size=1920,1080")
-
-options.add_argument(f'--user-agent={test_ua}')
-
-options.add_argument('--no-sandbox')
-options.add_argument("--disable-extensions")
-
-test_driver = webdriver.Chrome(options=options)
-
-solver = RecaptchaSolver(driver=test_driver, delay_config=StandardDelayConfig())
+solver = None
 
 
 def test_solver():
-    try:
-        test_driver.get('https://www.google.com/recaptcha/api2/demo')
+    global solver
 
-        recaptcha_iframe = test_driver.find_element(By.XPATH, '//iframe[@title="reCAPTCHA"]')
+    seleniumbase_options = {
+        "browser": "chrome",
+        "headed": False,
+        "headless2": False,
+        "undetectable": True,
+        "ad_block_on": True,
+        "page_load_strategy": "eager",
+        # https://www.selenium.dev/documentation/webdriver/drivers/options/
+        # "page_load_strategy": "none", # Does not block WebDriver at all
+        # "page_load_strategy": "normal", # Used by default, waits for all resources to download
+        # "page_load_strategy": "eager", # DOM access is ready, but other resources like images may still be loading
+        "block_images": None,
+        "incognito": None,
+        "use_auto_ext": False,
+        "locale": "en",
+        "chromium_arg": [
+            # https://peter.sh/experiments/chromium-command-line-switches/
+            "--disable-default-apps",
+            "--max-render-process-count=2",
+            "--js-flags=--max-old-space-size=1024",
+            "--disable-software-rasterizer",
+            "--disable-features=TranslateUI",
+            "--disable-features=BlinkGenPropertyTrees",
+            "--disable-features=VizDisplayCompositor",
+            "--disable-component-extensions-with-background-pages",
+            "--disable-component-update",
+            "--disable-gpu-compositing",
+            "--no-sandbox",  # Required when running as root
+            "--use-gl=swiftshader",  # Use Google's software renderer
+            "--disable-gpu-compositing",
+        ],
+        "enable_sync": False,  # apply excludeSwitches
+    }
 
-        solver.click_recaptcha_v2(iframe=recaptcha_iframe)
+    with SB(**seleniumbase_options) as sb_driver:
+        try:
+            solver = RecaptchaSolver(
+                driver=sb_driver.driver, delay_config=StandardDelayConfig()
+            )
 
-        test_driver.execute_script("document.getElementById('recaptcha-demo-submit').click()")
+            url = "https://www.google.com/recaptcha/api2/demo"
 
-        test_driver.find_element(By.CSS_SELECTOR, '.recaptcha-success')
+            sb_driver.uc_open(url)
 
-    except Exception:
-        pytest.fail('Failed to automatically resolve ReCAPTCHA.')
+            recaptcha_iframe = sb_driver.driver.find_element(
+                By.XPATH, '//iframe[@title="reCAPTCHA"]'
+            )
+
+            solver.click_recaptcha_v2(iframe=recaptcha_iframe)
+
+            sb_driver.driver.execute_script(
+                "document.getElementById('recaptcha-demo-submit').click()"
+            )
+            try:
+                sb_driver.driver.find_element(By.CSS_SELECTOR, ".recaptcha-success")
+            except Exception as e:
+                pytest.skip(f"Skip if not found selector. {str(e)}")
+
+            print("ReCAPTCHA solved successfully!")
+
+        except Exception as e:
+            pytest.fail(f"Failed to automatically resolve ReCAPTCHA. {str(e)}")

@@ -14,10 +14,15 @@ setup(
     long_description=open("README.md", "r").read(),
     long_description_content_type="text/markdown",
     install_requires=[
-        #'selenium~=4.8.0',
         "selenium==4.34.2",
         "pydub~=0.25.1",
-        "SpeechRecognition~=3.8.1",
+        "SpeechRecognition>=3.14.0",
         "requests>=2.28.1,<2.33.0",
     ],
+    extras_require={
+        ':python_version >= "3.13"': [
+            "audioop-lts",
+            "standard-aifc",
+        ],
+    },
 )
