@@ -14,7 +14,6 @@ setup(
     long_description=open("README.md", "r").read(),
     long_description_content_type="text/markdown",
     install_requires=[
-        #"selenium==4.34.2",
         "pydub~=0.25.1",
         "SpeechRecognition==3.14.3",
         "requests>=2.28.1,<2.33.0",
