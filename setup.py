@@ -13,15 +13,12 @@ setup(
     keywords="python, captcha, speech recognition, selenium, web automation",
     long_description=open("README.md", "r").read(),
     long_description_content_type="text/markdown",
+    python_requires=">=3.10",
     install_requires=[
         "pydub",
         "SpeechRecognition",
         "requests",
+        'audioop-lts; python_version >= "3.13"',
+        'standard-aifc; python_version >= "3.13"',
     ],
-    extras_require={
-        ':python_version >= "3.10"': [
-            "audioop-lts",
-            "standard-aifc",
-        ],
-    },
 )
