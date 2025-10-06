@@ -14,12 +14,12 @@ setup(
     long_description=open("README.md", "r").read(),
     long_description_content_type="text/markdown",
     install_requires=[
-        "pydub~=0.25.1",
-        "SpeechRecognition==3.14.3",
-        "requests>=2.28.1,<2.33.0",
+        "pydub",
+        "SpeechRecognition",
+        "requests",
     ],
     extras_require={
-        ':python_version >= "3.13"': [
+        ':python_version >= "3.12"': [
             "audioop-lts",
             "standard-aifc",
         ],
