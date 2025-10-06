@@ -19,7 +19,7 @@ setup(
         "requests",
     ],
     extras_require={
-        ':python_version >= "3.12"': [
+        ':python_version >= "3.10"': [
             "audioop-lts",
             "standard-aifc",
         ],
