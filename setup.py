@@ -13,7 +13,6 @@ setup(
     keywords="python, captcha, speech recognition, selenium, web automation",
     long_description=open("README.md", "r").read(),
     long_description_content_type="text/markdown",
-    python_requires=">=3.10",
     install_requires=[
         "pydub",
         "SpeechRecognition",
